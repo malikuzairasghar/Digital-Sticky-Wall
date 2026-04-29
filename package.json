@@ -1,0 +1,16 @@
+{
+  "name": "digital-sticky-wall",
+  "version": "1.0.0",
+  "description": "A beautiful full-stack sticky notes application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "uuid": "^9.0.0",
+    "cookie-parser": "^1.4.6"
+  }
+}

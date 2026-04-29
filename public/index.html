@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sticky Wall — Your Digital Canvas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="noise-overlay"></div>
+
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">📌</span>
+        <span class="logo-text">StickyWall</span>
+      </div>
+      <div class="header-meta">
+        <div class="session-badge" id="sessionBadge">
+          <span class="session-dot"></span>
+          <span id="sessionLabel">Connecting…</span>
+        </div>
+        <div class="stats-pill" id="statsPill">
+          <span id="statsCount">0</span> notes
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1 class="hero-title">Your thoughts,<br /><em>beautifully organised.</em></h1>
+    <p class="hero-sub">Pin ideas, tasks, and reminders on your personal digital canvas.</p>
+  </section>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input id="searchInput" class="search-input" type="text" placeholder="Search notes…" autocomplete="off" />
+    </div>
+    <div class="sort-wrap">
+      <select id="sortSelect" class="sort-select">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="alpha">A → Z</option>
+      </select>
+    </div>
+  </div>
+
+  <main class="wall-container">
+    <div class="notes-grid" id="notesGrid">
+  
+    </div>
+
+    <div class="empty-state" id="emptyState" hidden>
+      <div class="empty-icon">🌿</div>
+      <h3>Your wall is empty</h3>
+      <p>Press the <strong>+</strong> button to pin your first note.</p>
+    </div>
+  </main>
+
+  <button class="fab" id="fabBtn" aria-label="Add new note" title="Add note">
+    <span class="fab-plus">+</span>
+    <span class="fab-label">New note</span>
+  </button>
+
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Pin a new note</h2>
+        <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+      </div>
+
+      <div class="color-picker-row">
+        <span class="cp-label">Note colour</span>
+        <div class="color-swatches" id="colorSwatches">
+          <button class="swatch active" data-color="#FFDEE9" style="background:#FFDEE9" title="Blush"></button>
+          <button class="swatch" data-color="#B5EAD7" style="background:#B5EAD7" title="Mint"></button>
+          <button class="swatch" data-color="#C7CEEA" style="background:#C7CEEA" title="Lavender"></button>
+          <button class="swatch" data-color="#FFE0B2" style="background:#FFE0B2" title="Peach"></button>
+          <button class="swatch" data-color="#E8D5F5" style="background:#E8D5F5" title="Lilac"></button>
+          <button class="swatch" data-color="#D4F1F4" style="background:#D4F1F4" title="Sky"></button>
+          <button class="swatch" data-color="#FFDAC1" style="background:#FFDAC1" title="Apricot"></button>
+          <button class="swatch" data-color="#E2F0CB" style="background:#E2F0CB" title="Sage"></button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="noteTitle">Title <span class="required">*</span></label>
+        <input class="form-input" id="noteTitle" type="text" placeholder="Give your note a title…" maxlength="60" autocomplete="off" />
+        <span class="char-count" id="titleCount">0/60</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="noteDesc">Description <span class="required">*</span></label>
+        <textarea class="form-textarea" id="noteDesc" placeholder="Write your note here…" maxlength="400" rows="4"></textarea>
+        <span class="char-count" id="descCount">0/400</span>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="submitBtn">
+          <span class="btn-text">Pin it 📌</span>
+          <span class="btn-loader" hidden></span>
+        </button>
+      </div>
+
+      <p class="form-error" id="formError" hidden></p>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="modal-backdrop" id="deleteBackdrop" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="modal-title">Delete note?</h2>
+      </div>
+      <p class="delete-msg">This note will be permanently removed from your wall.</p>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="deleteCancelBtn">Keep it</button>
+        <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
