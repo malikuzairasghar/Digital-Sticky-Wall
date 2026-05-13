@@ -3,135 +3,224 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sticky Wall — Your Digital Canvas</title>
+  <title>StickyWall — Your Digital Canvas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=Caveat:wght@400;600;700&family=Dancing+Script:wght@400;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <div class="noise-overlay"></div>
-
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
   <div class="blob blob-3"></div>
 
-  <header class="header">
-    <div class="header-inner">
-      <div class="logo">
-        <span class="logo-icon">📌</span>
-        <span class="logo-text">StickyWall</span>
-      </div>
-      <div class="header-meta">
-        <div class="session-badge" id="sessionBadge">
-          <span class="session-dot"></span>
-          <span id="sessionLabel">Connecting…</span>
-        </div>
-        <div class="stats-pill" id="statsPill">
-          <span id="statsCount">0</span> notes
-        </div>
-      </div>
-    </div>
-  </header>
+  <!-- ═══════════════════ MAIN APP ═══════════════════ -->
+  <div class="app-root" id="appRoot">
 
-  <section class="hero">
-    <h1 class="hero-title">Your thoughts,<br /><em>beautifully organised.</em></h1>
-    <p class="hero-sub">Pin ideas, tasks, and reminders on your personal digital canvas.</p>
-  </section>
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-icon">📌</span>
+          <span class="logo-text">StickyWall</span>
+        </div>
+        <div class="header-meta">
+          <div class="stats-pill" id="statsPill">
+            <span id="statsCount">0</span> notes
+          </div>
+        </div>
+      </div>
+    </header>
 
-  <div class="toolbar">
-    <div class="search-wrap">
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-      </svg>
-      <input id="searchInput" class="search-input" type="text" placeholder="Search notes…" autocomplete="off" />
-    </div>
-    <div class="sort-wrap">
+    <section class="hero">
+      <h1 class="hero-title">Your thoughts,<br /><em>beautifully organised.</em></h1>
+      <p class="hero-sub">Pin ideas, tasks, and reminders on your personal digital canvas.</p>
+    </section>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input id="searchInput" class="search-input" type="text" placeholder="Search notes… (Ctrl+K)" autocomplete="off" />
+      </div>
       <select id="sortSelect" class="sort-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
         <option value="alpha">A → Z</option>
       </select>
     </div>
-  </div>
 
-  <main class="wall-container">
-    <div class="notes-grid" id="notesGrid">
-  
-    </div>
-
-    <div class="empty-state" id="emptyState" hidden>
-      <div class="empty-icon">🌿</div>
-      <h3>Your wall is empty</h3>
-      <p>Press the <strong>+</strong> button to pin your first note.</p>
-    </div>
-  </main>
-
-  <button class="fab" id="fabBtn" aria-label="Add new note" title="Add note">
-    <span class="fab-plus">+</span>
-    <span class="fab-label">New note</span>
-  </button>
-
-  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
-    <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-header">
-        <h2 class="modal-title" id="modalTitle">Pin a new note</h2>
-        <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    <main class="wall-container">
+      <div class="notes-grid" id="notesGrid"></div>
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-icon">🌿</div>
+        <h3>Your wall is empty</h3>
+        <p>Press the <strong>+</strong> button to pin your first note.</p>
       </div>
+    </main>
 
-      <div class="color-picker-row">
-        <span class="cp-label">Note colour</span>
-        <div class="color-swatches" id="colorSwatches">
-          <button class="swatch active" data-color="#FFDEE9" style="background:#FFDEE9" title="Blush"></button>
-          <button class="swatch" data-color="#B5EAD7" style="background:#B5EAD7" title="Mint"></button>
-          <button class="swatch" data-color="#C7CEEA" style="background:#C7CEEA" title="Lavender"></button>
-          <button class="swatch" data-color="#FFE0B2" style="background:#FFE0B2" title="Peach"></button>
-          <button class="swatch" data-color="#E8D5F5" style="background:#E8D5F5" title="Lilac"></button>
-          <button class="swatch" data-color="#D4F1F4" style="background:#D4F1F4" title="Sky"></button>
-          <button class="swatch" data-color="#FFDAC1" style="background:#FFDAC1" title="Apricot"></button>
-          <button class="swatch" data-color="#E2F0CB" style="background:#E2F0CB" title="Sage"></button>
+    <button class="fab" id="fabBtn" aria-label="Add new note" title="New note (Ctrl+N)">
+      <span class="fab-plus">+</span>
+      <span class="fab-label">New note</span>
+    </button>
+
+    <!-- ── Add Note Modal ─────────────────────────────── -->
+    <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+      <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modalTitle">Pin a new note</h2>
+          <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+        </div>
+
+        <!-- Colour -->
+        <div class="picker-row">
+          <span class="picker-label">Colour</span>
+          <div class="color-swatches" id="colorSwatches">
+            <button class="swatch active" data-color="#FFDEE9" style="background:#FFDEE9" title="Blush"></button>
+            <button class="swatch" data-color="#B5EAD7" style="background:#B5EAD7" title="Mint"></button>
+            <button class="swatch" data-color="#C7CEEA" style="background:#C7CEEA" title="Lavender"></button>
+            <button class="swatch" data-color="#FFE0B2" style="background:#FFE0B2" title="Peach"></button>
+            <button class="swatch" data-color="#E8D5F5" style="background:#E8D5F5" title="Lilac"></button>
+            <button class="swatch" data-color="#D4F1F4" style="background:#D4F1F4" title="Sky"></button>
+            <button class="swatch" data-color="#FFDAC1" style="background:#FFDAC1" title="Apricot"></button>
+            <button class="swatch" data-color="#E2F0CB" style="background:#E2F0CB" title="Sage"></button>
+            <button class="swatch" data-color="#FFF3B0" style="background:#FFF3B0" title="Lemon"></button>
+            <button class="swatch" data-color="#F8D7DA" style="background:#F8D7DA" title="Rose"></button>
+          </div>
+        </div>
+
+        <!-- Font -->
+        <div class="picker-row picker-row-font">
+          <span class="picker-label">Font</span>
+          <div class="font-options" id="fontOptions">
+            <button class="font-opt active" data-font="default">
+              <span class="font-preview" style="font-family:'DM Sans',sans-serif">Aa</span>
+              <span class="font-name">Default</span>
+            </button>
+            <button class="font-opt" data-font="playfair">
+              <span class="font-preview" style="font-family:'Playfair Display',serif">Aa</span>
+              <span class="font-name">Elegant</span>
+            </button>
+            <button class="font-opt" data-font="caveat">
+              <span class="font-preview" style="font-family:'Caveat',cursive">Aa</span>
+              <span class="font-name">Handwriting</span>
+            </button>
+            <button class="font-opt" data-font="dancing">
+              <span class="font-preview" style="font-family:'Dancing Script',cursive">Aa</span>
+              <span class="font-name">Cursive</span>
+            </button>
+            <button class="font-opt" data-font="courier">
+              <span class="font-preview" style="font-family:'Courier Prime',monospace">Aa</span>
+              <span class="font-name">Typewriter</span>
+            </button>
+            <button class="font-opt" data-font="nastaleeq">
+              <span class="font-preview" style="font-family:'Noto Nastaliq Urdu',serif;font-size:0.9rem;line-height:1.6">اردو</span>
+              <span class="font-name" style="font-family:'Noto Nastaliq Urdu',serif;direction:rtl">نستعلیق</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Title -->
+        <div class="form-group">
+          <label class="form-label" for="noteTitle">Title <span class="required">*</span></label>
+          <input class="form-input" id="noteTitle" type="text" placeholder="Give your note a title…" maxlength="60" autocomplete="off" />
+          <span class="char-count" id="titleCount">0/60</span>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label class="form-label">Description <span class="required">*</span></label>
+
+          <!-- Rich-text formatting toolbar -->
+          <div class="rte-toolbar" id="rteToolbar">
+
+            <!-- Text colour -->
+            <div class="rte-group">
+              <span class="rte-group-label">Text</span>
+              <div class="rte-swatches" id="textColorSwatches">
+                <button class="rte-swatch rte-swatch-auto active" data-color="auto" title="Default" style="background:linear-gradient(135deg,#1A1A2E 50%,#fff 50%);border:1.5px solid #ccc"></button>
+                <button class="rte-swatch" data-color="#C0392B" title="Red"       style="background:#C0392B"></button>
+                <button class="rte-swatch" data-color="#E67E22" title="Orange"    style="background:#E67E22"></button>
+                <button class="rte-swatch" data-color="#27AE60" title="Green"     style="background:#27AE60"></button>
+                <button class="rte-swatch" data-color="#2980B9" title="Blue"      style="background:#2980B9"></button>
+                <button class="rte-swatch" data-color="#8E44AD" title="Purple"    style="background:#8E44AD"></button>
+                <button class="rte-swatch" data-color="#E91E8C" title="Pink"      style="background:#E91E8C"></button>
+                <button class="rte-swatch" data-color="#555555" title="Grey"      style="background:#555555"></button>
+              </div>
+            </div>
+
+            <div class="rte-divider"></div>
+
+            <!-- Highlight colour -->
+            <div class="rte-group">
+              <span class="rte-group-label">Highlight</span>
+              <div class="rte-swatches" id="highlightColorSwatches">
+                <button class="rte-swatch rte-swatch-none active" data-color="none" title="No highlight" style="background:#fff;border:1.5px solid #ccc">
+                  <svg viewBox="0 0 14 14" width="10" height="10"><line x1="1" y1="1" x2="13" y2="13" stroke="#e04" stroke-width="2"/><line x1="13" y1="1" x2="1" y2="13" stroke="#e04" stroke-width="2"/></svg>
+                </button>
+                <button class="rte-swatch" data-color="#FFF176" title="Yellow"    style="background:#FFF176"></button>
+                <button class="rte-swatch" data-color="#A5D6A7" title="Green"     style="background:#A5D6A7"></button>
+                <button class="rte-swatch" data-color="#90CAF9" title="Blue"      style="background:#90CAF9"></button>
+                <button class="rte-swatch" data-color="#F48FB1" title="Pink"      style="background:#F48FB1"></button>
+                <button class="rte-swatch" data-color="#CE93D8" title="Lavender"  style="background:#CE93D8"></button>
+                <button class="rte-swatch" data-color="#FFCC80" title="Peach"     style="background:#FFCC80"></button>
+              </div>
+            </div>
+
+            <div class="rte-divider"></div>
+
+            <!-- Clear formatting -->
+            <button class="rte-clear-btn" id="rteClearBtn" title="Clear formatting">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/><line x1="2" y1="2" x2="22" y2="22"/>
+              </svg>
+              Clear
+            </button>
+          </div>
+
+          <div
+            class="form-rte"
+            id="noteDesc"
+            contenteditable="true"
+            role="textbox"
+            aria-multiline="true"
+            aria-label="Note description"
+            data-placeholder="Write your note here…"
+          ></div>
+          <span class="char-count" id="descCount">0/600</span>
+        </div>
+
+        <p class="form-error" id="formError" hidden></p>
+
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+          <button class="btn btn-primary" id="submitBtn">
+            <span class="btn-text">Pin it 📌</span>
+            <span class="btn-loader" hidden></span>
+          </button>
         </div>
       </div>
-
-      <div class="form-group">
-        <label class="form-label" for="noteTitle">Title <span class="required">*</span></label>
-        <input class="form-input" id="noteTitle" type="text" placeholder="Give your note a title…" maxlength="60" autocomplete="off" />
-        <span class="char-count" id="titleCount">0/60</span>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" for="noteDesc">Description <span class="required">*</span></label>
-        <textarea class="form-textarea" id="noteDesc" placeholder="Write your note here…" maxlength="400" rows="4"></textarea>
-        <span class="char-count" id="descCount">0/400</span>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
-        <button class="btn btn-primary" id="submitBtn">
-          <span class="btn-text">Pin it 📌</span>
-          <span class="btn-loader" hidden></span>
-        </button>
-      </div>
-
-      <p class="form-error" id="formError" hidden></p>
     </div>
-  </div>
 
-  <div class="toast-container" id="toastContainer"></div>
-
-  <div class="modal-backdrop" id="deleteBackdrop" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <h2 class="modal-title">Delete note?</h2>
-      </div>
-      <p class="delete-msg">This note will be permanently removed from your wall.</p>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" id="deleteCancelBtn">Keep it</button>
-        <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+    <!-- ── Delete Modal ───────────────────────────────── -->
+    <div class="modal-backdrop" id="deleteBackdrop" aria-hidden="true">
+      <div class="modal modal-sm" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <h2 class="modal-title">Delete note?</h2>
+        </div>
+        <p class="delete-msg">This note will be permanently removed from your wall.</p>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="deleteCancelBtn">Keep it</button>
+          <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+        </div>
       </div>
     </div>
-  </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+  </div><!-- /app-root -->
 
   <script src="app.js"></script>
 </body>
