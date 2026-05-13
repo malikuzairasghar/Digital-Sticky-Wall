@@ -16,7 +16,9 @@ A beautiful, full-stack sticky notes application with a glassmorphism UI, REST A
 - **Keyboard shortcuts**: `Ctrl+N` (new note), `Ctrl+K` (search), `Esc` (close)
 - **Auto-refreshing timestamps** (e.g. "2 min ago")
 - **Responsive** — works on all screen sizes
-
+- **Different Fonts with colours and highlighting Feature**
+- **Urdu Language Support**
+- **Notes Pin Option(Display over apps)**
 ---
 
 ## 🗂️ Project Structure
