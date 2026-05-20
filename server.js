@@ -75,6 +75,18 @@ app.patch("/api/notes/:id", (req, res) => {
   res.json({ success: true, note });
 });
 
+app.put("/api/notes/:id", (req, res) => {
+  const note = notesStore.find(n => n.id === req.params.id);
+  if (!note) return res.status(404).json({ success: false, message: "Note not found." });
+  const { title, description, descHtml } = req.body;
+  if (title       !== undefined) note.title       = title.trim();
+  if (description !== undefined) note.description = description.trim();
+  if (descHtml    !== undefined) note.descHtml    = descHtml;
+  note.updatedAt = new Date().toISOString();
+  saveJSON(NOTES_FILE, notesStore);
+  res.json({ success: true, note });
+});
+
 app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 app.listen(PORT, () => console.log(`\n  ✦ Sticky Wall → http://localhost:${PORT}\n`));
 module.exports = app;

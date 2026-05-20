@@ -80,6 +80,16 @@ const API = {
     if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
     return d;
   },
+  async put(path, body) {
+    const res = await fetch("/api" + path, {
+      method: "PUT", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await this._json(res);
+    if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
+    return d;
+  },
 };
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -197,9 +207,14 @@ function createNoteCard(note, delay = 0) {
     <div class="note-top">
       <h3 class="note-title">${escapeHtml(note.title)}</h3>
       <div class="note-actions">
-        <button class="note-float-btn" data-id="${note.id}" title="Float on screen" aria-label="Pin to screen">
+        <button class="note-float-btn" data-id="${note.id}" title="Float on screen (in-page)" aria-label="Float note">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/>
+          </svg>
+        </button>
+        <button class="note-desktop-btn" data-id="${note.id}" title="Pin above all apps (desktop overlay)" aria-label="Pin above all apps">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="12" y1="17" x2="12" y2="21"/><polyline points="8 21 12 17 16 21"/>
           </svg>
         </button>
         <button class="note-delete-btn" data-id="${note.id}" title="Delete" aria-label="Delete note">✕</button>
@@ -219,6 +234,10 @@ function createNoteCard(note, delay = 0) {
   card.querySelector(".note-float-btn").addEventListener("click", e => {
     e.stopPropagation();
     pinNoteToScreen(note);
+  });
+  card.querySelector(".note-desktop-btn").addEventListener("click", e => {
+    e.stopPropagation();
+    pinNoteToDesktop(note);
   });
 
   return card;
@@ -531,96 +550,205 @@ async function deleteNote(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  PIN TO SCREEN  (Document Picture-in-Picture)
+//  FLOATING PINNED NOTES  (in-page draggable panels, multiple at once)
 // ══════════════════════════════════════════════════════════════════════════════
 
-const activePipWindows = new Map();
+const activeFloatingNotes = new Map(); // noteId → { el, noteData }
+let   floatingZBase       = 9100;
 
-async function pinNoteToScreen(note) {
-  if (activePipWindows.has(note.id)) {
-    activePipWindows.get(note.id).close();
-    activePipWindows.delete(note.id);
-    updatePinBtn(note.id, false);
-    showToast("Note unpinned from screen.", "info");
-    return;
-  }
+function getFloatingLayer() {
+  return document.getElementById("floatingNotesLayer");
+}
 
-  if (!window.documentPictureInPicture) {
-    showToast("Screen pinning requires Chrome 116+ on desktop.", "error", 4500);
-    return;
-  }
+function cascadePosition(index) {
+  const base = { x: window.innerWidth - 310, y: 80 };
+  return { x: base.x - index * 28, y: base.y + index * 32 };
+}
 
-  try {
-    const h = Math.min(380, Math.max(200, 110 + Math.ceil(note.description.length / 2.6)));
-    const pipWindow = await window.documentPictureInPicture.requestWindow({ width: 320, height: h });
+function makeDraggable(el, handleEl) {
+  let startX, startY, origLeft, origTop, dragging = false;
 
-    const font    = note.font || "default";
-    const isUrdu  = font === "nastaleeq";
-    const family  = FONT_FAMILIES[font] || FONT_FAMILIES.default;
+  handleEl.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    dragging = true;
+    startX   = e.clientX;
+    startY   = e.clientY;
+    origLeft = parseInt(el.style.left) || 0;
+    origTop  = parseInt(el.style.top)  || 0;
+    el.classList.add("dragging");
+    el.style.zIndex = ++floatingZBase;
+    e.preventDefault();
+  });
 
-    // Fonts in PiP
-    const fontLink = pipWindow.document.createElement("link");
-    fontLink.rel  = "stylesheet";
-    fontLink.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@400;500;600&family=Caveat:wght@400;600&family=Dancing+Script:wght@400;600&family=Courier+Prime&family=Noto+Nastaliq+Urdu:wght@400;500;700&display=swap";
-    pipWindow.document.head.appendChild(fontLink);
+  document.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const dx  = e.clientX - startX;
+    const dy  = e.clientY - startY;
+    const maxX = window.innerWidth  - el.offsetWidth;
+    const maxY = window.innerHeight - el.offsetHeight;
+    el.style.left = Math.min(maxX, Math.max(0, origLeft + dx)) + "px";
+    el.style.top  = Math.min(maxY, Math.max(0, origTop  + dy)) + "px";
+  });
 
-    const style = pipWindow.document.createElement("style");
-    style.textContent = `
-      *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-      html,body{width:100%;height:100%;font-family:'DM Sans',sans-serif;background:transparent;overflow:hidden;user-select:none}
-      .card{width:100%;height:100%;background:${note.color};border-radius:14px;display:flex;flex-direction:column;position:relative;box-shadow:0 4px 24px rgba(0,0,0,.15);overflow:hidden}
-      .card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.55),rgba(255,255,255,.1));pointer-events:none;border-radius:14px}
-      .top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px;flex-shrink:0;gap:8px}
-      .pin{font-size:.9rem;opacity:.6;flex-shrink:0}
-      .dots{flex:1;display:flex;justify-content:center;gap:3px;opacity:.3}
-      .dots span{width:3px;height:3px;border-radius:50%;background:rgba(0,0,0,.5);display:inline-block}
-      .close-btn{width:22px;height:22px;border:none;background:rgba(0,0,0,.1);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:rgba(0,0,0,.55);flex-shrink:0;transition:.2s ease;font-family:'DM Sans',sans-serif;line-height:1}
-      .close-btn:hover{background:rgba(224,92,110,.2);color:#c44858;transform:scale(1.1)}
-      .body{flex:1;overflow-y:auto;padding:2px 16px 14px;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
-      .body::-webkit-scrollbar{width:4px}.body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:99px}
-      .title{font-family:${family};font-size:1rem;font-weight:700;color:#1A1A2E;line-height:${isUrdu?2:1.3};letter-spacing:-0.01em;word-break:break-word;margin-bottom:8px;${isUrdu?"direction:rtl;text-align:right;":""}}
-      .divider{height:1px;background:rgba(0,0,0,.1);margin-bottom:10px}
-      .desc{font-family:${family};font-size:.82rem;color:#3A3A5A;line-height:${isUrdu?2.2:1.65};word-break:break-word;white-space:pre-wrap;${isUrdu?"direction:rtl;text-align:right;":""}}
-      .footer{padding:6px 16px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-top:1px solid rgba(0,0,0,.07)}
-      .time{font-size:.65rem;color:#9898A8;font-weight:500}
-      .badge{font-size:.58rem;font-weight:700;letter-spacing:.07em;text-transform:${isUrdu?"none":"uppercase"};color:rgba(0,0,0,.3);background:rgba(0,0,0,.07);padding:2px 7px;border-radius:999px;${isUrdu?"font-family:"+family+";font-size:.75rem;direction:rtl;letter-spacing:0;":""}}
-    `;
-    pipWindow.document.head.appendChild(style);
+  document.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove("dragging");
+  });
+}
 
-    pipWindow.document.body.innerHTML = `
-      <div class="card">
-        <div class="top">
-          <span class="pin">📌</span>
-          <div class="dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-          <button class="close-btn" id="pipClose">✕</button>
-        </div>
-        <div class="body">
-          <div class="title">${escapeHtml(note.title)}</div>
-          <div class="divider"></div>
-          <div class="desc">${escapeHtml(note.description)}</div>
-        </div>
-        <div class="footer">
-          <span class="time">${formatTime(note.createdAt)}</span>
-          <span class="badge">${isUrdu ? "نوٹ" : "Pinned"}</span>
-        </div>
-      </div>`;
+function removeFloatingNote(noteId) {
+  const entry = activeFloatingNotes.get(noteId);
+  if (!entry) return;
+  entry.el.classList.add("closing");
+  setTimeout(() => {
+    entry.el.remove();
+    activeFloatingNotes.delete(noteId);
+    updatePinBtn(noteId, false);
+  }, 230);
+}
 
-    pipWindow.document.getElementById("pipClose").addEventListener("click", () => pipWindow.close());
+function createFloatingNote(note) {
+  const font   = note.font || "default";
+  const isUrdu = font === "nastaleeq";
+  const family = FONT_FAMILIES[font] || FONT_FAMILIES.default;
 
-    activePipWindows.set(note.id, pipWindow);
-    updatePinBtn(note.id, true);
-    showToast("Note floating on screen! 📌", "success");
+  const el = document.createElement("div");
+  el.className    = "floating-note";
+  el.dataset.fnId = note.id;
+  el.style.background  = note.color;
+  el.style.fontFamily  = family;
+  el.style.zIndex      = ++floatingZBase;
 
-    pipWindow.addEventListener("pagehide", () => {
-      activePipWindows.delete(note.id);
-      updatePinBtn(note.id, false);
+  const { x, y } = cascadePosition(activeFloatingNotes.size);
+  el.style.left = Math.min(x, window.innerWidth  - 290) + "px";
+  el.style.top  = Math.min(y, window.innerHeight - 180) + "px";
+
+  const descContent = note.descHtml
+    ? sanitizeNoteHtml(note.descHtml)
+    : escapeHtml(note.description || "");
+
+  el.innerHTML = `
+    <div class="fn-header">
+      <span class="fn-pin">📌</span>
+      <div class="fn-drag-dots">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="fn-actions">
+        <button class="fn-btn fn-edit-btn" title="Edit note" aria-label="Edit note">
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="fn-btn fn-close-btn" title="Unpin" aria-label="Close floating note">✕</button>
+      </div>
+    </div>
+    <div class="fn-body">
+      <div class="fn-title"${isUrdu ? ' dir="rtl"' : ""}>${escapeHtml(note.title)}</div>
+      <div class="fn-divider"></div>
+      <div class="fn-desc"${isUrdu ? ' dir="rtl"' : ""}>${descContent}</div>
+    </div>
+    <div class="fn-footer">
+      <span class="fn-time">${formatTime(note.createdAt)}</span>
+      <span class="fn-badge">Pinned</span>
+    </div>`;
+
+  const header    = el.querySelector(".fn-header");
+  const editBtn   = el.querySelector(".fn-edit-btn");
+  const closeBtn  = el.querySelector(".fn-close-btn");
+  const descEl    = el.querySelector(".fn-desc");
+
+  makeDraggable(el, header);
+
+  closeBtn.addEventListener("click", () => {
+    removeFloatingNote(note.id);
+    showToast("Note unpinned.", "info");
+  });
+
+  // Bring to front on click
+  el.addEventListener("mousedown", () => { el.style.zIndex = ++floatingZBase; });
+
+  // ── Edit mode ──────────────────────────────────────────────────
+  let editing = false;
+
+  editBtn.addEventListener("click", () => {
+    if (editing) return;
+    editing = true;
+
+    // Replace desc with textarea
+    const textarea = document.createElement("textarea");
+    textarea.className   = "fn-desc-edit";
+    textarea.value       = note.description || "";
+    if (isUrdu) textarea.dir = "rtl";
+    descEl.replaceWith(textarea);
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+    // Replace edit btn with save + cancel
+    editBtn.style.display = "none";
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "fn-btn fn-save-btn";
+    saveBtn.title     = "Save changes";
+    saveBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    const cancelEditBtn = document.createElement("button");
+    cancelEditBtn.className = "fn-btn fn-cancel-edit-btn";
+    cancelEditBtn.title     = "Cancel edit";
+    cancelEditBtn.innerHTML = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+    const actions = el.querySelector(".fn-actions");
+    actions.insertBefore(saveBtn, closeBtn);
+    actions.insertBefore(cancelEditBtn, closeBtn);
+
+    function exitEdit(save) {
+      editing = false;
+      if (save) {
+        const newText = textarea.value.trim();
+        if (newText) {
+          note.description = newText;
+          note.descHtml    = escapeHtml(newText);
+          // Update the State.notes array so search still works
+          const stateNote = State.notes.find(n => n.id === note.id);
+          if (stateNote) { stateNote.description = newText; stateNote.descHtml = escapeHtml(newText); }
+          // Persist to server (best-effort)
+          API.put(`/notes/${note.id}`, { description: newText, descHtml: escapeHtml(newText) })
+            .catch(() => {});
+          showToast("Note updated! ✏️", "success");
+        }
+      }
+      const newDesc = document.createElement("div");
+      newDesc.className = "fn-desc";
+      if (isUrdu) newDesc.dir = "rtl";
+      newDesc.innerHTML = sanitizeNoteHtml(note.descHtml || escapeHtml(note.description || ""));
+      textarea.replaceWith(newDesc);
+      saveBtn.remove();
+      cancelEditBtn.remove();
+      editBtn.style.display = "";
+    }
+
+    saveBtn.addEventListener("click",       () => exitEdit(true));
+    cancelEditBtn.addEventListener("click", () => exitEdit(false));
+    textarea.addEventListener("keydown", e => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); exitEdit(true); }
+      if (e.key === "Escape") { e.preventDefault(); exitEdit(false); }
     });
-  } catch (err) {
-    const msg = err.name === "NotAllowedError"
-      ? "Permission denied. Please allow the popup and try again."
-      : "Could not pin note: " + err.message;
-    showToast(msg, "error", 4000);
+  });
+
+  return el;
+}
+
+function pinNoteToScreen(note) {
+  if (activeFloatingNotes.has(note.id)) {
+    removeFloatingNote(note.id);
+    showToast("Note unpinned.", "info");
+    return;
   }
+
+  const el = createFloatingNote(note);
+  getFloatingLayer().appendChild(el);
+  activeFloatingNotes.set(note.id, { el, noteData: note });
+  updatePinBtn(note.id, true);
+  showToast("Note floating on screen! 📌", "success");
 }
 
 function updatePinBtn(noteId, active) {
@@ -706,8 +834,412 @@ function bindAppEvents() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  BOOT
+//  DESKTOP OVERLAY  (Document Picture-in-Picture — always on top of all apps)
 // ══════════════════════════════════════════════════════════════════════════════
+
+const activePipWindows = new Map(); // noteId → pipWindow
+
+async function pinNoteToDesktop(note) {
+  // Toggle off if already open
+  if (activePipWindows.has(note.id)) {
+    try { activePipWindows.get(note.id).close(); } catch {}
+    activePipWindows.delete(note.id);
+    updateDesktopBtn(note.id, false);
+    showToast("Note unpinned from desktop.", "info");
+    return;
+  }
+
+  if (!window.documentPictureInPicture) {
+    showToast("Desktop overlay requires Chrome 116+ or Edge 116+. Try updating your browser.", "error", 5500);
+    return;
+  }
+
+  const font   = note.font || "default";
+  const isUrdu = font === "nastaleeq";
+  const family = FONT_FAMILIES[font] || FONT_FAMILIES.default;
+
+  // Height scales with content length
+  const contentH = Math.min(320, Math.max(140, 90 + Math.ceil((note.description || "").length / 2.8)));
+
+  let pipWindow;
+  try {
+    pipWindow = await window.documentPictureInPicture.requestWindow({
+      width:  300,
+      height: contentH + 80,
+      disallowReturnToOpener: false,
+    });
+  } catch (err) {
+    const msg = err.name === "NotAllowedError"
+      ? "Permission denied — click directly on the 🖥️ button and try again."
+      : "Could not open desktop overlay: " + err.message;
+    showToast(msg, "error", 5000);
+    return;
+  }
+
+  /* ── Styles ──────────────────────────────────────────── */
+  const style = pipWindow.document.createElement("style");
+  style.textContent = `
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      background: transparent; overflow: hidden;
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@400;500;600&family=Caveat:wght@400;600&family=Dancing+Script:wght@400;600&family=Courier+Prime&family=Noto+Nastaliq+Urdu:wght@400;500;700&display=swap');
+
+    .card {
+      width: 100%; height: 100%;
+      background: ${note.color};
+      border-radius: 14px;
+      display: flex; flex-direction: column;
+      position: relative;
+      box-shadow: 0 6px 32px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+      overflow: hidden;
+    }
+    .card::before {
+      content: ''; position: absolute; inset: 0; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(255,255,255,.55), rgba(255,255,255,.08));
+      pointer-events: none;
+    }
+
+    /* Header */
+    .top {
+      display: flex; align-items: center;
+      padding: 9px 10px 6px; gap: 6px; flex-shrink: 0;
+      background: rgba(255,255,255,.28); backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgba(0,0,0,.07);
+      cursor: default; user-select: none;
+    }
+    .pin { font-size: .85rem; opacity: .65; flex-shrink: 0; }
+    .dots { flex: 1; display: flex; gap: 2px; align-items: center; opacity: .3; }
+    .dots span { width: 3px; height: 3px; border-radius: 50%; background: rgba(0,0,0,.6); display: inline-block; }
+    .top-btns { display: flex; gap: 4px; flex-shrink: 0; }
+    .top-btn {
+      width: 22px; height: 22px; border: none;
+      background: rgba(0,0,0,.09); border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: .6rem; color: rgba(0,0,0,.5);
+      transition: background .18s, color .18s, transform .15s;
+      line-height: 1;
+    }
+    .top-btn:hover { transform: scale(1.15); }
+    .top-btn.edit-btn:hover { background: rgba(100,149,237,.25); color: #3a7bd5; }
+    .top-btn.close-btn:hover { background: rgba(224,92,110,.2); color: #c44858; }
+    .top-btn.save-btn { background: rgba(39,174,96,.15); color: #27ae60; }
+    .top-btn.save-btn:hover { background: rgba(39,174,96,.3); }
+    .top-btn.cancel-btn:hover { background: rgba(0,0,0,.15); }
+
+    /* Body */
+    .body {
+      flex: 1; overflow-y: auto; padding: 10px 14px 10px;
+      scrollbar-width: thin; scrollbar-color: rgba(0,0,0,.15) transparent;
+    }
+    .body::-webkit-scrollbar { width: 4px; }
+    .body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 99px; }
+
+    .title {
+      font-family: ${family};
+      font-size: .96rem; font-weight: 700; color: #1A1A2E;
+      line-height: ${isUrdu ? 2 : 1.3};
+      word-break: break-word; margin-bottom: 7px;
+      ${isUrdu ? "direction:rtl; text-align:right;" : ""}
+    }
+    .divider { height: 1px; background: rgba(0,0,0,.1); margin-bottom: 8px; }
+    .desc {
+      font-family: ${family};
+      font-size: .8rem; color: #1A1A2E;
+      line-height: ${isUrdu ? 2.1 : 1.62};
+      word-break: break-word; white-space: pre-wrap;
+      ${isUrdu ? "direction:rtl; text-align:right;" : ""}
+    }
+    .desc-edit {
+      width: 100%; min-height: 72px;
+      border: 1.5px solid rgba(0,0,0,.15); border-radius: 8px;
+      background: rgba(255,255,255,.55); backdrop-filter: blur(4px);
+      padding: 7px 9px; font-size: .8rem; color: #1A1A2E;
+      font-family: ${family}; line-height: 1.6;
+      resize: vertical; outline: none;
+      ${isUrdu ? "direction:rtl;" : ""}
+    }
+    .desc-edit:focus { border-color: rgba(100,149,237,.55); }
+
+    /* Footer */
+    .footer {
+      padding: 5px 14px 9px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0; border-top: 1px solid rgba(0,0,0,.07);
+    }
+    .time { font-size: .62rem; color: #9898A8; font-weight: 500; }
+    .badge {
+      font-size: .54rem; font-weight: 700; letter-spacing: .07em;
+      text-transform: ${isUrdu ? "none" : "uppercase"};
+      color: rgba(0,0,0,.28); background: rgba(0,0,0,.07);
+      padding: 2px 7px; border-radius: 999px;
+      ${isUrdu ? "font-family:" + family + "; font-size:.72rem; direction:rtl; letter-spacing:0;" : ""}
+    }
+
+    /* Resize hint */
+    .resize-hint {
+      position: absolute; bottom: 2px; right: 4px;
+      font-size: .48rem; color: rgba(0,0,0,.18);
+      pointer-events: none; letter-spacing: .02em;
+    }
+  `;
+  pipWindow.document.head.appendChild(style);
+
+  /* ── Font preload ─────────────────────────────────────── */
+  const fontLink = pipWindow.document.createElement("link");
+  fontLink.rel  = "stylesheet";
+  fontLink.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@400;500;600&family=Caveat:wght@400;600&family=Dancing+Script:wght@400;600&family=Courier+Prime&family=Noto+Nastaliq+Urdu:wght@400;500;700&display=swap";
+  pipWindow.document.head.appendChild(fontLink);
+
+  /* ── Initial HTML ─────────────────────────────────────── */
+  const descContent = note.descHtml
+    ? note.descHtml.replace(/<[^>]+>/g, "")   // strip HTML tags for PiP plain text
+    : (note.description || "");
+
+  pipWindow.document.body.innerHTML = `
+    <div class="card">
+      <div class="top">
+        <span class="pin">📌</span>
+        <div class="dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="top-btns">
+          <button class="top-btn edit-btn" id="editBtn" title="Edit note">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button class="top-btn close-btn" id="closeBtn" title="Unpin from desktop">✕</button>
+        </div>
+      </div>
+      <div class="body">
+        <div class="title">${escapeHtmlPip(note.title)}</div>
+        <div class="divider"></div>
+        <div class="desc" id="descView">${escapeHtmlPip(descContent)}</div>
+      </div>
+      <div class="footer">
+        <span class="time">${formatTime(note.createdAt)}</span>
+        <span class="badge">${isUrdu ? "نوٹ" : "Desktop Pin"}</span>
+      </div>
+      <span class="resize-hint">↗ drag edge to resize</span>
+    </div>`;
+
+  /* ── Close button ─────────────────────────────────────── */
+  pipWindow.document.getElementById("closeBtn").addEventListener("click", () => {
+    pipWindow.close();
+  });
+
+  /* ── Edit button ──────────────────────────────────────── */
+  const editBtn  = pipWindow.document.getElementById("editBtn");
+  const descView = pipWindow.document.getElementById("descView");
+  let   editing  = false;
+
+  editBtn.addEventListener("click", () => {
+    if (editing) return;
+    editing = true;
+
+    const textarea = pipWindow.document.createElement("textarea");
+    textarea.className = "desc-edit";
+    textarea.value     = note.description || "";
+    if (isUrdu) textarea.dir = "rtl";
+    descView.replaceWith(textarea);
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+    // Swap edit btn with save + cancel
+    editBtn.style.display = "none";
+
+    const saveBtn = pipWindow.document.createElement("button");
+    saveBtn.className = "top-btn save-btn";
+    saveBtn.title     = "Save (Ctrl+Enter)";
+    saveBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    const cancelBtn = pipWindow.document.createElement("button");
+    cancelBtn.className = "top-btn cancel-btn";
+    cancelBtn.title     = "Cancel (Esc)";
+    cancelBtn.innerHTML = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+    const topBtns = pipWindow.document.querySelector(".top-btns");
+    topBtns.insertBefore(saveBtn, pipWindow.document.getElementById("closeBtn"));
+    topBtns.insertBefore(cancelBtn, pipWindow.document.getElementById("closeBtn"));
+
+    function exitEdit(save) {
+      editing = false;
+      if (save) {
+        const newText = textarea.value.trim();
+        if (newText) {
+          note.description = newText;
+          note.descHtml    = escapeHtmlPip(newText);
+          const stateNote = State.notes.find(n => n.id === note.id);
+          if (stateNote) { stateNote.description = newText; stateNote.descHtml = escapeHtmlPip(newText); }
+          API.put(`/notes/${note.id}`, { description: newText, descHtml: escapeHtmlPip(newText) }).catch(() => {});
+          // Refresh the wall card if visible
+          renderNotes(State.notes);
+          showToast("Note updated! ✏️", "success");
+        }
+      }
+      const newDescView = pipWindow.document.createElement("div");
+      newDescView.className = "desc";
+      newDescView.id        = "descView";
+      if (isUrdu) newDescView.dir = "rtl";
+      newDescView.textContent = note.description || "";
+      textarea.replaceWith(newDescView);
+      saveBtn.remove(); cancelBtn.remove();
+      editBtn.style.display = "";
+    }
+
+    saveBtn.addEventListener("click", () => exitEdit(true));
+    cancelBtn.addEventListener("click", () => exitEdit(false));
+    textarea.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); exitEdit(true); }
+      if (e.key === "Escape") { e.preventDefault(); exitEdit(false); }
+    });
+  });
+
+  /* ── Register & track ─────────────────────────────────── */
+  activePipWindows.set(note.id, pipWindow);
+  updateDesktopBtn(note.id, true);
+  showToast("Note pinned above all apps! 🖥️", "success", 3200);
+
+  pipWindow.addEventListener("pagehide", () => {
+    activePipWindows.delete(note.id);
+    updateDesktopBtn(note.id, false);
+  });
+}
+
+// Simple HTML escape for use inside PiP window (no DOM available)
+function escapeHtmlPip(str) {
+  return String(str || "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function updateDesktopBtn(noteId, active) {
+  const btn = DOM.notesGrid.querySelector(`.note-desktop-btn[data-id="${noteId}"]`);
+  if (!btn) return;
+  btn.classList.toggle("active", active);
+  btn.title = active ? "Unpin from desktop" : "Pin above all apps (desktop overlay)";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  VOICE TO TEXT  (Web Speech API)
+// ══════════════════════════════════════════════════════════════════════════════
+
+function initVoiceToText() {
+  const voiceBtn   = document.getElementById("voiceBtn");
+  const label      = document.getElementById("voiceBtnLabel");
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    voiceBtn.classList.add("unsupported");
+    voiceBtn.title = "Voice input not supported in this browser (try Chrome)";
+    label.textContent = "Not supported";
+    return;
+  }
+
+  const recog = new SpeechRecognition();
+  recog.continuous    = true;
+  recog.interimResults= true;
+  recog.lang          = "en-US";
+
+  let isRecording   = false;
+  let interimSpan   = null;
+  let lastFinalText = "";
+
+  recog.onstart = () => {
+    isRecording = true;
+    voiceBtn.classList.add("recording");
+    label.textContent = "Stop";
+    voiceBtn.title    = "Stop dictation";
+
+    // Insert a span for interim text
+    DOM.noteDesc.focus();
+    interimSpan = document.createElement("span");
+    interimSpan.style.opacity = "0.45";
+    interimSpan.style.fontStyle = "italic";
+    DOM.noteDesc.appendChild(interimSpan);
+  };
+
+  recog.onresult = (e) => {
+    let interim = "";
+    let finalChunk = "";
+
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const transcript = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        finalChunk += transcript;
+      } else {
+        interim += transcript;
+      }
+    }
+
+    if (finalChunk) {
+      // Commit final text as a real text node before the interim span
+      const textNode = document.createTextNode(finalChunk + " ");
+      if (interimSpan && interimSpan.parentNode === DOM.noteDesc) {
+        DOM.noteDesc.insertBefore(textNode, interimSpan);
+      } else {
+        DOM.noteDesc.appendChild(textNode);
+      }
+      lastFinalText += finalChunk + " ";
+      // Update char counter
+      const n = DOM.noteDesc.textContent.length;
+      DOM.descCount.textContent = `${n}/600`;
+      DOM.descCount.classList.toggle("warn", n >= 540);
+    }
+
+    if (interimSpan) interimSpan.textContent = interim;
+  };
+
+  recog.onerror = (e) => {
+    if (e.error === "not-allowed") {
+      showToast("Microphone access denied. Please allow mic in browser settings.", "error", 5000);
+    } else if (e.error !== "no-speech") {
+      showToast(`Voice error: ${e.error}`, "error");
+    }
+    stopRecording();
+  };
+
+  recog.onend = () => {
+    if (isRecording) {
+      // auto-restarted if user didn't click stop
+    }
+    stopRecording();
+  };
+
+  function stopRecording() {
+    isRecording = false;
+    voiceBtn.classList.remove("recording");
+    label.textContent = "Dictate";
+    voiceBtn.title = "Dictate note (voice to text)";
+    if (interimSpan && interimSpan.parentNode) {
+      // Replace interim span with finalised plain text if it still has content
+      if (interimSpan.textContent.trim()) {
+        const textNode = document.createTextNode(interimSpan.textContent + " ");
+        interimSpan.replaceWith(textNode);
+      } else {
+        interimSpan.remove();
+      }
+      interimSpan = null;
+    }
+    lastFinalText = "";
+  }
+
+  voiceBtn.addEventListener("click", () => {
+    if (voiceBtn.classList.contains("unsupported")) return;
+    if (isRecording) {
+      recog.stop();
+    } else {
+      // Detect Urdu font → use Urdu language
+      recog.lang = State.selectedFont === "nastaleeq" ? "ur-PK" : "en-US";
+      try { recog.start(); }
+      catch { /* already started */ }
+    }
+  });
+}
+
+
 
 async function init() {
   // Init UI components
@@ -719,6 +1251,7 @@ async function init() {
   initKeyboard();
   initBackdropClicks();
   initTimeRefresh();
+  initVoiceToText();
   bindAppEvents();
 
   // Load notes directly — no auth required
